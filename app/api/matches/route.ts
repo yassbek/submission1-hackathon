@@ -7,11 +7,33 @@ export async function GET(req: Request) {
   const userId = url.searchParams.get("userId");
   const role = url.searchParams.get("role");
 
+  console.log("[/api/matches] Request params:", { userId, role });
+
   if (!userId || !role) {
     return NextResponse.json(
       { error: "userId and role are required" },
       { status: 400 }
     );
+  }
+
+  // DEBUG: Check all matches in database
+  const allMatches = await prisma.matchSuggestion.findMany({
+    include: {
+      need: {
+        include: { user: true }
+      },
+      expert: true,
+    },
+  });
+  console.log(`[/api/matches] Total matches in DB: ${allMatches.length}`);
+  if (allMatches.length > 0) {
+    console.log("[/api/matches] Sample match:", {
+      needOwnerId: allMatches[0].need.userId,
+      needOwnerEmail: allMatches[0].need.user.email,
+      expertId: allMatches[0].expertUserId,
+      expertEmail: allMatches[0].expert.email,
+      needIsActive: allMatches[0].need.isActive,
+    });
   }
 
   if (role === "founder") {
@@ -30,6 +52,8 @@ export async function GET(req: Request) {
         score: "desc",
       },
     });
+
+    console.log(`[/api/matches] Found ${matches.length} matches for founder ${userId}`);
 
     const result = matches.map((m) => ({
       id: m.id,
@@ -69,6 +93,8 @@ export async function GET(req: Request) {
         createdAt: "desc",
       },
     });
+
+    console.log(`[/api/matches] Found ${matches.length} matches for expert ${userId}`);
 
     const result = matches.map((m) => ({
       id: m.id,
