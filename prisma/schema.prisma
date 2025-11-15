@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  founder
+  expert
+  admin
+}
+
+enum NeedCategory {
+  product
+  sales
+  fundraising
+  branding
+  ux
+  marketing
+  tech
+  ops
+  other
+}
+
+enum MatchStatus {
+  pending
+  accepted
+  declined
+}
+
+enum CoffeeChatStatus {
+  proposed
+  scheduled
+  completed
+  cancelled
+}
+
+enum ProposedSlotStatus {
+  pending
+  selected
+  expired
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String?
+  emailVerified DateTime?
+  image         String?
+  role          UserRole
+
+  needs          Need[]
+  learnings      Learning[]
+  expertMatches  MatchSuggestion[] @relation("ExpertMatchSuggestions")
+  requesterChats CoffeeChat[]      @relation("RequesterChats")
+  expertChats    CoffeeChat[]      @relation("ExpertChats")
+  accounts       Account[]
+  sessions       Session[]
+
+  createdAt DateTime @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Need {
+  id        String       @id @default(cuid())
+  user      User         @relation(fields: [userId], references: [id])
+  userId    String
+  label     String
+  category  NeedCategory
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+
+  matches   MatchSuggestion[]
+  chats     CoffeeChat[]
+}
+
+model Learning {
+  id        String       @id @default(cuid())
+  user      User         @relation(fields: [userId], references: [id])
+  userId    String
+  label     String
+  category  NeedCategory
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+}
+
+model MatchSuggestion {
+  id            String       @id @default(cuid())
+  need          Need         @relation(fields: [needId], references: [id])
+  needId        String
+  expert        User         @relation("ExpertMatchSuggestions", fields: [expertUserId], references: [id])
+  expertUserId  String
+  score         Float
+  reason        String
+  status        MatchStatus  @default(pending)
+  createdAt     DateTime     @default(now())
+}
+
+model CoffeeChat {
+  id            String            @id @default(cuid())
+  need          Need              @relation(fields: [needId], references: [id])
+  needId        String
+  requester     User              @relation("RequesterChats", fields: [requesterId], references: [id])
+  requesterId   String
+  expert        User              @relation("ExpertChats", fields: [expertId], references: [id])
+  expertId      String
+  status        CoffeeChatStatus  @default(proposed)
+  chosenSlot    ProposedSlot?     @relation("ChosenSlot", fields: [chosenSlotId], references: [id])
+  chosenSlotId  String?           @unique
+  meetingLink   String?
+  createdAt     DateTime          @default(now())
+
+  proposedSlots ProposedSlot[]
+}
+
+model ProposedSlot {
+  id           String             @id @default(cuid())
+  coffeeChat   CoffeeChat         @relation(fields: [coffeeChatId], references: [id])
+  coffeeChatId String
+  startTime    DateTime
+  endTime      DateTime
+  status       ProposedSlotStatus @default(pending)
+
+  chosenBy     CoffeeChat?        @relation("ChosenSlot")
+}
